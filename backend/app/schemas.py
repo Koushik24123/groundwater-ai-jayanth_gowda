@@ -31,3 +31,14 @@ class PredictionRequest(BaseModel):
 
     class Config:
         extra = "forbid"
+
+
+class SimplePredictionRequest(BaseModel):
+    """User-facing prediction input. Engineered features are generated in the backend."""
+
+    station: str = Field(..., min_length=1, description="Monitoring station name.")
+    date: str = Field(..., description="Observation date in YYYY-MM-DD format.")
+    time: str = Field("00:00", description="Observation time in HH:MM (24-hour) format.")
+
+    class Config:
+        extra = "forbid"
