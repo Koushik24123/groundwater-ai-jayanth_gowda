@@ -1,0 +1,26 @@
+{
+  "model_name": "Linear Regression",
+  "features": [
+    "Latitude",
+    "Longitude",
+    "RL_MSL",
+    "Year",
+    "Month",
+    "Day",
+    "Hour",
+    "DayOfWeek",
+    "WeekOfYear",
+    "Quarter",
+    "IsWeekend",
+    "Lag_1",
+    "Lag_4",
+    "Lag_28",
+    "RollingMean_4",
+    "RollingStd_4",
+    "Hour_sin",
+    "Hour_cos",
+    "Month_sin",
+    "Month_cos",
+    "Station_ID"
+  ]
+}

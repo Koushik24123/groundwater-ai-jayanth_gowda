@@ -1,0 +1,4 @@
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+python-dotenv==1.0.0
+# Backend-specific minimal dependencies. The top-level requirements.txt already contains ML deps; avoid duplication.
