@@ -4,7 +4,8 @@ const navItems = [
   { to: '/', label: 'Home' },
   { to: '/prediction', label: 'Prediction' },
   { to: '/recharge', label: 'Recharge Assessment' },
-  { to: '/explainability', label: 'Explainability' },
+  { to: '/spatial', label: 'Spatial Analysis' },
+  { to: '/explainability', label: 'Technical Insights' },
   { to: '/about', label: 'About' },
 ]
 

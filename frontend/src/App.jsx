@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Prediction from './pages/Prediction'
 import Recharge from './pages/Recharge'
+import Spatial from './pages/Spatial'
 import Explainability from './pages/Explainability'
 import About from './pages/About'
 
@@ -15,6 +16,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/prediction" element={<Prediction />} />
           <Route path="/recharge" element={<Recharge />} />
+          <Route path="/spatial" element={<Spatial />} />
           <Route path="/explainability" element={<Explainability />} />
           <Route path="/about" element={<About />} />
           <Route path="*" element={<Navigate to="/" replace />} />
