@@ -200,4 +200,4 @@ function Recharge() {
   )
 }
 
-export default Recharges
+export default Recharge
