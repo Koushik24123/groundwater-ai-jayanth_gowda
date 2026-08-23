@@ -919,3 +919,70 @@ tbody tr:hover,
     width: 100%;
   }
 }
+/* GDSS additions */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-danger { background: #fee2e2; color: #b91c1c; }
+.badge-neutral { background: #e2e8f0; color: #334155; }
+
+.condition-summary-list { display: grid; gap: 0.75rem; }
+.condition-summary-item { display: flex; align-items: center; gap: 0.75rem; }
+.condition-summary-item strong { font-size: 1.1rem; color: #0f172a; }
+.condition-summary-item span { color: #64748b; font-size: 0.85rem; }
+
+.reason-list { margin-top: 1.25rem; }
+.reason-list h3 { margin-bottom: 0.6rem; }
+.reason-list ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; color: #334155; }
+
+.recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.recommendation-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.85rem; padding: 1rem; }
+.recommendation-card h4 { margin: 0 0 0.4rem; color: #1d4ed8; }
+.recommendation-card p { margin: 0; color: #334155; font-size: 0.92rem; }
+
+.sparkline-wrap { margin-top: 0.75rem; }
+.sparkline-svg { width: 100%; height: 140px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; }
+.sparkline-labels { display: flex; justify-content: space-between; color: #64748b; font-size: 0.75rem; margin-top: 0.35rem; }
+
+.recharge-teaser { margin-top: 1.5rem; padding: 1.1rem; border-radius: 0.9rem; background: #f0fdf4; border: 1px solid #bbf7d0; }
+.recharge-teaser .action-link { margin-top: 0.75rem; }
+
+.recharge-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; margin-top: 1.5rem; align-items: start; }
+.guidance-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.5rem; }
+
+.spatial-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; margin-top: 1.5rem; align-items: start; }
+.spatial-map-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.25rem; }
+.spatial-map-svg { width: 100%; height: auto; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
+.spatial-map-bg { fill: #eef2ff; }
+.spatial-map-point { cursor: pointer; }
+.spatial-map-label { font-size: 11px; fill: #0f172a; font-weight: 700; }
+
+.map-legend { display: flex; gap: 1.25rem; margin-top: 0.85rem; color: #334155; font-size: 0.85rem; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.35rem; }
+.legend-green { background: #16a34a; }
+.legend-yellow { background: #d97706; }
+.legend-red { background: #dc2626; }
+
+.group-features { margin: 0.2rem 0 0; color: #64748b; font-size: 0.78rem; }
+
+@media (max-width: 960px) {
+  .recharge-layout,
+  .spatial-layout {
+    grid-template-columns: 1fr;
+  }
+}
