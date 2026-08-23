@@ -1,302 +1,212 @@
-import { useState } from 'react'
-import { predictGroundwater } from '../services/api'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { getStations, predictSimple } from '../services/api'
+import StationSelect from '../components/StationSelect'
+import ConditionBadge from '../components/ConditionBadge'
+import TrendBadge from '../components/TrendBadge'
+import ConfidenceTag from '../components/ConfidenceTag'
+import ReasonList from '../components/ReasonList'
+import TrendSparkline from '../components/TrendSparkline'
 
-const exampleValues = {
-  latitude: '13.07',
-  longitude: '77.45',
-  rlMsl: '849',
-  date: '2021-10-06',
-  time: '00:00',
-  lag1: '-22.71',
-  lag4: '-22.34',
-  lag28: '-22.51',
-  rollingMean4: '-22.8625',
-  rollingStd4: '0.4192354151706821',
-  stationId: '0',
+function toDateInputValue(isoString) {
+  if (!isoString) return ''
+  return isoString.slice(0, 10)
 }
 
-function getIsoWeek(date) {
-  const tempDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = tempDate.getUTCDay() || 7
-  tempDate.setUTCDate(tempDate.getUTCDate() + 4 - dayNum)
-  const startOfYear = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1))
-  return Math.ceil((((tempDate - startOfYear) / 86400000) + 1) / 7)
-}
-
-function buildPredictionPayload(formData) {
-  const dateValue = new Date(`${formData.date}T${formData.time}`)
-
-  if (Number.isNaN(dateValue.getTime())) {
-    throw new Error('The selected date and time are invalid.')
-  }
-
-  const month = dateValue.getMonth() + 1
-  const hour = dateValue.getHours()
-  const dayOfWeek = dateValue.getDay()
-
-  return {
-    Latitude: Number(formData.latitude),
-    Longitude: Number(formData.longitude),
-    RL_MSL: Number(formData.rlMsl),
-    Year: dateValue.getFullYear(),
-    Month: month,
-    Day: dateValue.getDate(),
-    Hour: hour,
-    DayOfWeek: dayOfWeek,
-    WeekOfYear: getIsoWeek(dateValue),
-    Quarter: Math.floor((month - 1) / 3) + 1,
-    IsWeekend: dayOfWeek >= 5 ? 1 : 0,
-    Lag_1: Number(formData.lag1),
-    Lag_4: Number(formData.lag4),
-    Lag_28: Number(formData.lag28),
-    RollingMean_4: Number(formData.rollingMean4),
-    RollingStd_4: Number(formData.rollingStd4),
-    Hour_sin: Math.sin((2 * Math.PI * hour) / 24),
-    Hour_cos: Math.cos((2 * Math.PI * hour) / 24),
-    Month_sin: Math.sin((2 * Math.PI * (month - 1)) / 12),
-    Month_cos: Math.cos((2 * Math.PI * (month - 1)) / 12),
-    Station_ID: Number(formData.stationId),
-  }
-}
-
-function validateForm(formData) {
-  const errors = {}
-
-  const latitude = Number(formData.latitude)
-  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-    errors.latitude = 'Latitude must be a number between -90 and 90.'
-  }
-
-  const longitude = Number(formData.longitude)
-  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-    errors.longitude = 'Longitude must be a number between -180 and 180.'
-  }
-
-  const rlMsl = Number(formData.rlMsl)
-  if (!Number.isFinite(rlMsl)) {
-    errors.rlMsl = 'RL_MSL must be a valid numeric value.'
-  }
-
-  const stationId = Number(formData.stationId)
-  if (!Number.isInteger(stationId) || stationId < 0) {
-    errors.stationId = 'Station_ID must be a non-negative integer.'
-  }
-
-  const requiredNumericFields = [
-    ['lag1', 'Lag_1'],
-    ['lag4', 'Lag_4'],
-    ['lag28', 'Lag_28'],
-    ['rollingMean4', 'RollingMean_4'],
-    ['rollingStd4', 'RollingStd_4'],
-  ]
-
-  requiredNumericFields.forEach(([field, label]) => {
-    const value = Number(formData[field])
-    if (!Number.isFinite(value)) {
-      errors[field] = `${label} must be a valid numeric value.`
-    }
-  })
-
-  if (!formData.date) {
-    errors.date = 'Date is required.'
-  }
-
-  if (!formData.time) {
-    errors.time = 'Time is required.'
-  }
-
-  if (formData.date && formData.time) {
-    const dateValue = new Date(`${formData.date}T${formData.time}`)
-    if (Number.isNaN(dateValue.getTime())) {
-      errors.date = 'Date and time must form a valid timestamp.'
-    }
-  }
-
-  return errors
+function toTimeInputValue(isoString) {
+  if (!isoString || isoString.length < 16) return '00:00'
+  return isoString.slice(11, 16)
 }
 
 function Prediction() {
-  const [formData, setFormData] = useState(exampleValues)
-  const [errors, setErrors] = useState({})
-  const [result, setResult] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [apiMessage, setApiMessage] = useState('')
+  const [searchParams] = useSearchParams()
+  const presetStation = searchParams.get('station') || ''
 
-  const handleChange = (event) => {
-    const { name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: value }))
-    setErrors((current) => ({ ...current, [name]: '' }))
-  }
+  const [stations, setStations] = useState({ loading: true, data: [], error: '' })
+  const [form, setForm] = useState({ station: '', date: '', time: '' })
+  const [result, setResult] = useState({ loading: false, data: null, error: '' })
 
-  const loadExampleValues = () => {
-    setFormData(exampleValues)
-    setErrors({})
-    setApiMessage('')
-    setResult(null)
+  useEffect(() => {
+    let isMounted = true
+
+    const loadStations = async () => {
+      try {
+        const response = await getStations()
+        if (!isMounted) return
+        const list = response?.stations || []
+        setStations({ loading: false, data: list, error: '' })
+
+        const initial = list.find((item) => item.station === presetStation) || list[0]
+        if (initial) {
+          setForm({
+            station: initial.station,
+            date: toDateInputValue(initial.last_observation),
+            time: toTimeInputValue(initial.last_observation),
+          })
+        }
+      } catch (error) {
+        if (isMounted) {
+          setStations({ loading: false, data: [], error: error?.message || 'Stations could not be loaded.' })
+        }
+      }
+    }
+
+    loadStations()
+    return () => { isMounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const selectedStationMeta = useMemo(
+    () => stations.data.find((item) => item.station === form.station) || null,
+    [stations.data, form.station],
+  )
+
+  const handleStationChange = (stationName) => {
+    const meta = stations.data.find((item) => item.station === stationName)
+    setForm({
+      station: stationName,
+      date: meta ? toDateInputValue(meta.last_observation) : '',
+      time: meta ? toTimeInputValue(meta.last_observation) : '00:00',
+    })
+    setResult({ loading: false, data: null, error: '' })
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    const nextErrors = validateForm(formData)
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors)
-      setApiMessage('Please correct the highlighted fields before submitting.')
-      setResult(null)
+    if (!form.station || !form.date || !form.time) {
+      setResult({ loading: false, data: null, error: 'Please select a station, date, and time.' })
       return
     }
 
-    setIsSubmitting(true)
-    setApiMessage('')
-    setErrors({})
-
+    setResult({ loading: true, data: null, error: '' })
     try {
-      const payload = buildPredictionPayload(formData)
-      const response = await predictGroundwater(payload)
-
-      if (!response || response.status !== 'success') {
-        throw new Error('The model did not return a successful prediction response.')
-      }
-
-      setResult(response)
-      setApiMessage('')
+      const response = await predictSimple(form)
+      setResult({ loading: false, data: response, error: '' })
     } catch (error) {
-      setResult(null)
-      setApiMessage(error?.message || 'Prediction request failed.')
-    } finally {
-      setIsSubmitting(false)
+      setResult({ loading: false, data: null, error: error?.message || 'Prediction request failed.' })
     }
   }
+
+  const data = result.data
 
   return (
     <div className="page-shell prediction-shell">
       <header className="page-header">
         <span className="eyebrow">Groundwater Prediction</span>
-        <h1>Groundwater Prediction</h1>
+        <h1>Station-Level Groundwater Prediction</h1>
       </header>
 
       <p className="lead-text">
-        Enter the location, timestamp, and recent groundwater values to generate a prediction from the
-        trained project model. The form automatically derives the calendar and cyclical features required
-        by the saved model metadata.
+        Choose a monitoring station and a date and time. The trained model and the required
+        historical, seasonal, and location features are prepared automatically in the backend —
+        you only need to describe when and where.
       </p>
 
-      <form className="prediction-form" onSubmit={handleSubmit} noValidate>
+      <form className="prediction-form" onSubmit={handleSubmit}>
         <section className="form-section">
-          <h2>Location Information</h2>
-          <div className="field-grid">
-            <label className="field-group">
-              <span>Latitude</span>
-              <input name="latitude" type="number" step="any" value={formData.latitude} onChange={handleChange} />
-              {errors.latitude && <small className="field-error">{errors.latitude}</small>}
-            </label>
+          <h2>Station and Time</h2>
 
-            <label className="field-group">
-              <span>Longitude</span>
-              <input name="longitude" type="number" step="any" value={formData.longitude} onChange={handleChange} />
-              {errors.longitude && <small className="field-error">{errors.longitude}</small>}
-            </label>
+          {stations.loading ? (
+            <p className="card-loading">Loading monitoring stations...</p>
+          ) : stations.error ? (
+            <p className="card-error">{stations.error}</p>
+          ) : (
+            <div className="field-grid">
+              <label className="field-group">
+                <span>Monitoring Station</span>
+                <StationSelect stations={stations.data} value={form.station} onChange={handleStationChange} />
+              </label>
 
-            <label className="field-group">
-              <span>RL_MSL</span>
-              <input name="rlMsl" type="number" step="any" value={formData.rlMsl} onChange={handleChange} />
-              {errors.rlMsl && <small className="field-error">{errors.rlMsl}</small>}
-            </label>
+              <label className="field-group">
+                <span>Date</span>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
+                />
+              </label>
 
-            <label className="field-group">
-              <span>Station_ID</span>
-              <input name="stationId" type="number" step="1" value={formData.stationId} onChange={handleChange} />
-              {errors.stationId && <small className="field-error">{errors.stationId}</small>}
-            </label>
-          </div>
-        </section>
+              <label className="field-group">
+                <span>Time</span>
+                <input
+                  type="time"
+                  value={form.time}
+                  onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}
+                />
+              </label>
+            </div>
+          )}
 
-        <section className="form-section">
-          <h2>Observation Date and Time</h2>
-          <div className="field-grid">
-            <label className="field-group">
-              <span>Date</span>
-              <input name="date" type="date" value={formData.date} onChange={handleChange} />
-              {errors.date && <small className="field-error">{errors.date}</small>}
-            </label>
-
-            <label className="field-group">
-              <span>Time</span>
-              <input name="time" type="time" value={formData.time} onChange={handleChange} />
-              {errors.time && <small className="field-error">{errors.time}</small>}
-            </label>
-          </div>
-        </section>
-
-        <section className="form-section">
-          <h2>Historical Groundwater Information</h2>
-          <div className="field-grid">
-            <label className="field-group">
-              <span>Lag_1</span>
-              <input name="lag1" type="number" step="any" value={formData.lag1} onChange={handleChange} />
-              {errors.lag1 && <small className="field-error">{errors.lag1}</small>}
-            </label>
-
-            <label className="field-group">
-              <span>Lag_4</span>
-              <input name="lag4" type="number" step="any" value={formData.lag4} onChange={handleChange} />
-              {errors.lag4 && <small className="field-error">{errors.lag4}</small>}
-            </label>
-
-            <label className="field-group">
-              <span>Lag_28</span>
-              <input name="lag28" type="number" step="any" value={formData.lag28} onChange={handleChange} />
-              {errors.lag28 && <small className="field-error">{errors.lag28}</small>}
-            </label>
-
-            <label className="field-group">
-              <span>RollingMean_4</span>
-              <input name="rollingMean4" type="number" step="any" value={formData.rollingMean4} onChange={handleChange} />
-              {errors.rollingMean4 && <small className="field-error">{errors.rollingMean4}</small>}
-            </label>
-
-            <label className="field-group">
-              <span>RollingStd_4</span>
-              <input name="rollingStd4" type="number" step="any" value={formData.rollingStd4} onChange={handleChange} />
-              {errors.rollingStd4 && <small className="field-error">{errors.rollingStd4}</small>}
-            </label>
-          </div>
+          {selectedStationMeta && (
+            <p className="info-note">
+              Records for {selectedStationMeta.station} run from{' '}
+              {selectedStationMeta.first_observation?.slice(0, 10)} to{' '}
+              {selectedStationMeta.last_observation?.slice(0, 10)}. Dates after the last observation
+              are treated as a forward-looking estimate.
+            </p>
+          )}
         </section>
 
         <div className="form-actions">
-          <button type="button" className="secondary-button" onClick={loadExampleValues}>
-            Load Example Values
-          </button>
-          <button type="submit" className="primary-button" disabled={isSubmitting}>
-            {isSubmitting ? 'Predicting...' : 'Predict Groundwater Level'}
+          <button type="submit" className="primary-button" disabled={result.loading}>
+            {result.loading ? 'Predicting...' : 'Run Prediction'}
           </button>
         </div>
       </form>
 
-      {apiMessage && <div className="form-message error-message">{apiMessage}</div>}
+      {result.error && <div className="form-message error-message">{result.error}</div>}
 
-      {result && (
+      {data && (
         <div className="prediction-result">
-          <h2>Prediction Result</h2>
+          <h2>Prediction Result — {data.station?.name}</h2>
+
           <div className="result-grid">
             <div className="result-item highlight">
               <span>Predicted Groundwater Level</span>
-              <strong>{Number(result.predicted_groundwater_level).toFixed(4)} meters</strong>
+              <strong>{Number(data.prediction?.value).toFixed(2)} m</strong>
             </div>
             <div className="result-item">
-              <span>Model name</span>
-              <strong>{result.model_name}</strong>
+              <span>Groundwater Condition</span>
+              <ConditionBadge label={data.condition?.label} level={data.condition?.level} />
             </div>
             <div className="result-item">
-              <span>Feature count</span>
-              <strong>{result.feature_count}</strong>
+              <span>Trend</span>
+              <TrendBadge label={data.trend?.label} direction={data.trend?.direction} />
+            </div>
+            <div className="result-item">
+              <span>Prediction Confidence</span>
+              <ConfidenceTag label={data.confidence?.label} />
             </div>
           </div>
-          <p className="result-note">
-            This value is produced by the trained model using the supplied location, time, and historical
-            groundwater features. It reflects the project model output and is displayed according to the
-            dataset’s project target convention.
-          </p>
+
+          <p className="result-note">{data.condition?.interpretation}</p>
+          <p className="result-note">{data.trend?.interpretation}</p>
+          {data.confidence?.note && <p className="result-note">{data.confidence.note}</p>}
+          {data.prediction?.is_extrapolated && (
+            <p className="info-note warning-note">
+              This date is beyond the last observed record, so the prediction is a forward-looking
+              estimate built from the most recent available history.
+            </p>
+          )}
+
+          {data.history?.length > 1 && (
+            <div className="data-section">
+              <h3>Recent Groundwater Trend</h3>
+              <TrendSparkline history={data.history} />
+            </div>
+          )}
+
+          <ReasonList title="What influenced this prediction" items={data.why} />
+
+          {data.recharge && (
+            <div className="recharge-teaser">
+              <h3>Recharge Assessment: {data.recharge.category}</h3>
+              <p>{data.recharge.headline}</p>
+              <Link className="action-link" to={`/recharge?station=${encodeURIComponent(data.station?.name || '')}`}>
+                View Full Recharge Guidance
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>
