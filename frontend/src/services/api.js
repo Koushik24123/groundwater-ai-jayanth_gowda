@@ -62,3 +62,37 @@ export async function getFeatureImportance() {
 export async function getPermutationImportance() {
   return request('/explainability/permutation-importance')
 }
+export async function getStations() {
+  return request('/stations')
+}
+
+export async function getStation(stationName) {
+  return request(`/stations/${encodeURIComponent(stationName)}`)
+}
+
+export async function getStationHistory(stationName, limit = 180) {
+  return request(`/stations/${encodeURIComponent(stationName)}/history?limit=${limit}`)
+}
+
+export async function predictSimple({ station, date, time }) {
+  return request('/predict/simple', {
+    method: 'POST',
+    body: JSON.stringify({ station, date, time }),
+  })
+}
+
+export async function getDashboardOverview() {
+  return request('/dashboard/overview')
+}
+
+export async function getSpatialStations() {
+  return request('/spatial/stations')
+}
+
+export async function getRechargeGuidance(stationId) {
+  return request(`/recharge/stations/${encodeURIComponent(stationId)}/guidance`)
+}
+
+export async function getExplainabilityPlainLanguage() {
+  return request('/explainability/plain-language')
+}
